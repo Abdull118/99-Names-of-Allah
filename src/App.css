@@ -1,38 +1,112 @@
-.App {
+
+body{
+  font-family: 'Times New Roman', Times, serif;
+
+}
+
+.header{
+
   text-align: center;
+  padding-top: 10px;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+.description{
+  text-align: center;
+
+  font-size: 11px;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
+.headerContainer{
+  width: 100vw;
+  border-bottom: 1px solid lightGray;
+  padding-bottom: 10px;
+  box-shadow: 0 0 10px rgba(0,0,0, .1);
+  background-color: #CDAC2F;
+  font-size: 20px;
   color: white;
 }
 
-.App-link {
-  color: #61dafb;
+.flashcard{
+  display: flex;
+  justify-content: center;
+  text-align: center;
+  position: relative;
+  transform: translate(0%, 50%);
+  font-size: 40px;
+  border: 1px solid lightGray;
+  border-radius: 5px;
+  width: 80vw;
+  margin: auto;
+  box-shadow: 0 0 10px rgba(0,0,0,.1);
+  padding-bottom: 30px;
+  background: rgba(255, 255,255, 0.85);
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+
+.front button{
+  background-color: rgb(10, 96, 48);
+  border: 0;
+  border-radius: 10px;
+  padding: 15px;
+  font-size: 20px;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.front button:hover{
+  
+  background-color: #CDAC2F;
+}
+
+.front p, .back p{
+  color: rgb(10, 96, 48);
+}
+
+.veryHard{
+  background-color: red;
+}
+
+.hard{
+  background-color: orange;
+}
+
+.good{
+  background-color: green;
+}
+
+.easy{
+  background-color: blue;
+}
+
+
+.veryHard, .hard, .good, .easy{
+  border: 0;
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 15px;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  margin-left: 10px;
+}
+
+.app{
+ position: absolute; 
+  z-index: 10;
+}
+.footerImg{
+  width: 100vw;
+  position: absolute;
+  top: 0;
+  z-index: -1;
+}
+
+.footerImg2{
+  object-fit: cover;
+  position: absolute;
+  z-index: -1;
+  top: 50px;
+  width: 100%;
+  
 }
