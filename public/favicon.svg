@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Naseeh icon">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0F4B3C"/>
+      <stop offset="1" stop-color="#0A2E25"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F0D698"/>
+      <stop offset="1" stop-color="#C99B3C"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+
+  <path fill="url(#gold)" d="M32 10l4.2 8.3 9.3.8-6.7 6 1.9 9.1-8.7-4.4-8.7 4.4 1.9-9.1-6.7-6 9.3-.8z" opacity="0.96"/>
+
+  <circle cx="31" cy="35" r="12" fill="#F4F0E4" opacity="0.96"/>
+  <circle cx="35" cy="35" r="10" fill="url(#bg)"/>
+  <circle cx="41.2" cy="31.2" r="2.2" fill="#F0D698"/>
+</svg>
