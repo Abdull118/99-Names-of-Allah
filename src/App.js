@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import './App.css';
 import islamicBackdrop from './images/islamicBackdrop.svg';
 import { useWindowWidth } from './components/functions/useWindowWidth';
@@ -774,6 +775,7 @@ const App = () => {
   const [notifyEmail, setNotifyEmail] = useState('');
   const [notifyError, setNotifyError] = useState('');
   const [notifyStatus, setNotifyStatus] = useState('idle');
+  const [referenceTime, setReferenceTime] = useState(() => new Date());
 
   useEffect(() => {
     warmUpNaseehServer();
@@ -821,16 +823,20 @@ const App = () => {
 
       const storedCards = loadCardsFromStorage();
       if (storedCards?.length) {
+        const now = new Date();
+        setReferenceTime(now);
         setCards(storedCards);
-        setCurrentCardIndex(findNextDueCardIndex(storedCards));
+        setCurrentCardIndex(findNextDueCardIndex(storedCards, now));
         setIsLoading(false);
         return;
       }
 
       try {
         const fetchedCards = await fetchCards();
+        const now = new Date();
+        setReferenceTime(now);
         setCards(fetchedCards);
-        setCurrentCardIndex(findNextDueCardIndex(fetchedCards));
+        setCurrentCardIndex(findNextDueCardIndex(fetchedCards, now));
         saveCardsToStorage(fetchedCards);
       } catch (fetchError) {
         setError('Unable to load cards right now. Please try again.');
@@ -842,6 +848,23 @@ const App = () => {
 
     initializeCards();
   }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setReferenceTime(new Date());
+    }, 15000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!cards.length) {
+      return;
+    }
+
+    const nextDueIndex = findNextDueCardIndex(cards, referenceTime);
+    setCurrentCardIndex((previousIndex) => (previousIndex === nextDueIndex ? previousIndex : nextDueIndex));
+  }, [cards, referenceTime]);
 
   useEffect(() => {
     if (activeView === 'comingSoon') {
@@ -865,12 +888,11 @@ const App = () => {
   }, [activeView, isComingSoonToastDismissed, showComingSoonToast, showNotifyModal]);
 
   const dueCount = useMemo(() => {
-    const now = new Date();
-    return cards.filter((card) => new Date(card.nextReview) <= now).length;
-  }, [cards]);
+    return cards.filter((card) => new Date(card.nextReview) <= referenceTime).length;
+  }, [cards, referenceTime]);
 
   const dueTomorrowCount = useMemo(() => {
-    const now = new Date();
+    const now = referenceTime;
     const tomorrowStart = getStartOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
     const dayAfterTomorrowStart = getStartOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2));
 
@@ -878,7 +900,7 @@ const App = () => {
       const reviewDate = new Date(card.nextReview);
       return reviewDate >= tomorrowStart && reviewDate < dayAfterTomorrowStart;
     }).length;
-  }, [cards]);
+  }, [cards, referenceTime]);
 
   const learningCount = useMemo(
     () => cards.filter((card) => (
@@ -889,7 +911,10 @@ const App = () => {
 
   const reviewingTodayCount = learningCount;
 
-  const upcomingReviewDate = useMemo(() => getNextUpcomingReviewDate(cards), [cards]);
+  const upcomingReviewDate = useMemo(
+    () => getNextUpcomingReviewDate(cards, referenceTime),
+    [cards, referenceTime]
+  );
 
   const currentCard = useMemo(() => {
     if (currentCardIndex === null || currentCardIndex < 0 || currentCardIndex >= cards.length) {
@@ -916,9 +941,11 @@ const App = () => {
       index === currentCardIndex ? updatedCard : card
     ));
 
+    const now = new Date();
+    setReferenceTime(now);
     setCards(updatedCards);
     saveCardsToStorage(updatedCards);
-    setCurrentCardIndex(findNextDueCardIndex(updatedCards));
+    setCurrentCardIndex(findNextDueCardIndex(updatedCards, now));
   };
 
   const dismissTooltip = () => {
@@ -1109,6 +1136,8 @@ const App = () => {
         error={notifyError}
         status={notifyStatus}
       />
+
+      <Analytics />
     </div>
   );
 };

@@ -1,4 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
+jest.mock('@vercel/analytics/react', () => ({
+  Analytics: () => null,
+}), { virtual: true });
 import App from './App';
 
 const sampleResponse = {
