@@ -45,13 +45,27 @@ test('renders flashcard title and can reveal card meaning', async () => {
   expect(screen.queryByRole('button', { name: /Start Flashcards/i })).not.toBeInTheDocument();
   expect(screen.queryByText(/Add To Home Screen/i)).not.toBeInTheDocument();
   expect(await screen.findByText(/due tomorrow/i)).toBeInTheDocument();
-  expect(await screen.findByText(/Learning/i)).toBeInTheDocument();
-  expect(await screen.findByText(/Reviewing today/i)).toBeInTheDocument();
+  expect(await screen.findByText(/new cards/i)).toBeInTheDocument();
+  expect(await screen.findByText(/Reviewing/i)).toBeInTheDocument();
 
   const revealButton = await screen.findByRole('button', { name: /reveal meaning/i });
   fireEvent.click(revealButton);
 
   expect(await screen.findByText(/The Beneficent/i)).toBeInTheDocument();
+});
+
+test('saves per-card notes and restores them from local storage', async () => {
+  render(<App />);
+
+  const revealButton = await screen.findByRole('button', { name: /reveal meaning/i });
+  fireEvent.click(revealButton);
+
+  const notesInput = await screen.findByLabelText(/Your Notes/i);
+  fireEvent.change(notesInput, { target: { value: 'Ramadan note for Ar-Rahman' } });
+  fireEvent.blur(notesInput);
+
+  const stored = JSON.parse(localStorage.getItem('asma_flashcards_v2') || '[]');
+  expect(stored[0]?.userNote).toBe('Ramadan note for Ar-Rahman');
 });
 
 test('opens menu and switches to matching game', async () => {

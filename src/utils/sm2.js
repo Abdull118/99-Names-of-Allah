@@ -6,6 +6,8 @@ export const DEFAULT_CARD_STATE = {
   learningStep: 0,
   nextIntervalMinutes: null,
   nextIntervalDays: null,
+  lastReviewedDate: null,
+  lastPassedDate: null,
 };
 
 const MIN_EASINESS_FACTOR = 1.3;

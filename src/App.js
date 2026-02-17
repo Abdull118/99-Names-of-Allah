@@ -7,7 +7,6 @@ import { getIslamicExplanation } from './data/islamicExplanations';
 import {
   calculateSM2,
   DEFAULT_CARD_STATE,
-  findNextDueCardIndex,
   getNextReviewDate,
   getNextUpcomingReviewDate,
 } from './utils/sm2';
@@ -163,6 +162,11 @@ const normalizeCard = (item, index) => {
     normalizedCardData.stage = hadReviewProgress ? 'review' : 'learning';
   }
 
+  // Backward compatibility for older localStorage records.
+  if (!normalizedCardData.lastReviewedDate && normalizedCardData.lastPassedDate) {
+    normalizedCardData.lastReviewedDate = normalizedCardData.lastPassedDate;
+  }
+
   return {
     ...item,
     number,
@@ -170,6 +174,7 @@ const normalizeCard = (item, index) => {
     transliteration: item.transliteration || `Name ${number}`,
     en: item.en || { meaning: item.meaning || 'Meaning unavailable' },
     cardData: normalizedCardData,
+    userNote: typeof item.userNote === 'string' ? item.userNote : '',
     nextReview: item.nextReview || new Date().toISOString(),
   };
 };
@@ -243,7 +248,67 @@ const formatDate = (date) => {
 };
 
 const getStartOfDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+const getDayKey = (date) => {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+const isCardDueAt = (card, referenceDate) => {
+  const nextReview = new Date(card.nextReview);
+  return !Number.isNaN(nextReview.getTime()) && nextReview <= referenceDate;
+};
+
+const getCardReviewedDayKey = (card) => (
+  card.cardData?.lastReviewedDate || card.cardData?.lastPassedDate || null
+);
+
+const findNextCardIndexByPriority = (cardsArray, referenceDate = new Date()) => {
+  const todayKey = getDayKey(referenceDate);
+  let nextQuickRepeatIndex = null;
+  let nextQuickRepeatTime = Number.POSITIVE_INFINITY;
+  let nextReviewingIndex = null;
+  let nextReviewingTime = Number.POSITIVE_INFINITY;
+  let nextNewIndex = null;
+  let nextNewTime = Number.POSITIVE_INFINITY;
+
+  cardsArray.forEach((card, index) => {
+    const nextReview = new Date(card.nextReview);
+    if (Number.isNaN(nextReview.getTime()) || nextReview > referenceDate) {
+      return;
+    }
+
+    const reviewTime = nextReview.getTime();
+    const hasReviewedToday = getCardReviewedDayKey(card) === todayKey;
+    const isQuickRepeat = Number.isFinite(Number(card.cardData?.nextIntervalMinutes))
+      && Number(card.cardData?.nextIntervalMinutes) > 0;
+
+    if (isQuickRepeat) {
+      if (reviewTime < nextQuickRepeatTime) {
+        nextQuickRepeatTime = reviewTime;
+        nextQuickRepeatIndex = index;
+      }
+      return;
+    }
+
+    if (hasReviewedToday) {
+      if (reviewTime < nextReviewingTime) {
+        nextReviewingTime = reviewTime;
+        nextReviewingIndex = index;
+      }
+      return;
+    }
+
+    if (reviewTime < nextNewTime) {
+      nextNewTime = reviewTime;
+      nextNewIndex = index;
+    }
+  });
+
+  return nextQuickRepeatIndex ?? nextReviewingIndex ?? nextNewIndex;
+};
 
 const buildMatchingRound = (sourceCards, pairCount) => {
   const cardsToUse = shuffle(sourceCards).slice(0, pairCount);
@@ -488,30 +553,34 @@ const SideMenu = ({ isOpen, onClose, activeView, setActiveView }) => {
 
 const FlashcardView = ({
   card,
-  dueCount,
+  newCount,
   dueTomorrowCount,
-  learningCount,
-  reviewingTodayCount,
+  reviewingCount,
   upcomingReviewDate,
   onGrade,
+  onNoteChange,
 }) => {
   const [flipped, setFlipped] = useState(false);
+  const [noteText, setNoteText] = useState('');
 
   useEffect(() => {
     setFlipped(false);
   }, [card?.number]);
 
+  useEffect(() => {
+    setNoteText(card?.userNote || '');
+  }, [card?.number, card?.userNote]);
+
   if (!card) {
     return (
       <section className="panel empty-panel">
         <div className="panel-head">
-          <span className="badge">{dueCount} due now</span>
+          <span className="badge">{newCount} new cards</span>
           <span className="badge muted">{dueTomorrowCount} due tomorrow</span>
-          <span className="badge muted">Learning {learningCount}</span>
-          <span className="badge muted">Reviewing today {reviewingTodayCount}</span>
+          <span className="badge muted">Reviewing {reviewingCount}</span>
         </div>
         <h3>All caught up</h3>
-        <p>You have no cards due now. Your next review is {formatDate(upcomingReviewDate)}.</p>
+        <p>You have no new or review cards right now. Your next review is {formatDate(upcomingReviewDate)}.</p>
       </section>
     );
   }
@@ -521,10 +590,9 @@ const FlashcardView = ({
   return (
     <section className="panel">
       <div className="panel-head">
-        <span className="badge">{dueCount} due now</span>
+        <span className="badge">{newCount} new cards</span>
         <span className="badge muted">{dueTomorrowCount} due tomorrow</span>
-        <span className="badge muted">Learning {learningCount}</span>
-        <span className="badge muted">Reviewing today {reviewingTodayCount}</span>
+        <span className="badge muted">Reviewing {reviewingCount}</span>
         <span className="badge muted">Card {card.number} / 99</span>
       </div>
       <div className={`flashcard ${flipped ? 'flipped' : ''}`}>
@@ -539,6 +607,16 @@ const FlashcardView = ({
         <div className="flashcard-face flashcard-back">
           <p className="meaning">{getMeaningText(card)}</p>
           <p className="explanation">{explanation}</p>
+          <div className="notes-wrap">
+            <label htmlFor={`notes-${card.number}`}>Your Notes</label>
+            <textarea
+              id={`notes-${card.number}`}
+              value={noteText}
+              onChange={(event) => setNoteText(event.target.value)}
+              onBlur={() => onNoteChange(noteText)}
+              placeholder="Add your notes from the Ramadan Asma ul Husna series..."
+            />
+          </div>
 
           <div className="grade-grid">
             <button className="grade very-hard" onClick={() => onGrade(1)}>
@@ -826,7 +904,7 @@ const App = () => {
         const now = new Date();
         setReferenceTime(now);
         setCards(storedCards);
-        setCurrentCardIndex(findNextDueCardIndex(storedCards, now));
+        setCurrentCardIndex(findNextCardIndexByPriority(storedCards, now));
         setIsLoading(false);
         return;
       }
@@ -836,7 +914,7 @@ const App = () => {
         const now = new Date();
         setReferenceTime(now);
         setCards(fetchedCards);
-        setCurrentCardIndex(findNextDueCardIndex(fetchedCards, now));
+        setCurrentCardIndex(findNextCardIndexByPriority(fetchedCards, now));
         saveCardsToStorage(fetchedCards);
       } catch (fetchError) {
         setError('Unable to load cards right now. Please try again.');
@@ -862,7 +940,7 @@ const App = () => {
       return;
     }
 
-    const nextDueIndex = findNextDueCardIndex(cards, referenceTime);
+    const nextDueIndex = findNextCardIndexByPriority(cards, referenceTime);
     setCurrentCardIndex((previousIndex) => (previousIndex === nextDueIndex ? previousIndex : nextDueIndex));
   }, [cards, referenceTime]);
 
@@ -887,8 +965,18 @@ const App = () => {
     return () => clearTimeout(timer);
   }, [activeView, isComingSoonToastDismissed, showComingSoonToast, showNotifyModal]);
 
-  const dueCount = useMemo(() => {
-    return cards.filter((card) => new Date(card.nextReview) <= referenceTime).length;
+  const reviewingCount = useMemo(() => {
+    const todayKey = getDayKey(referenceTime);
+    return cards.filter((card) => (
+      isCardDueAt(card, referenceTime) && getCardReviewedDayKey(card) === todayKey
+    )).length;
+  }, [cards, referenceTime]);
+
+  const newCount = useMemo(() => {
+    const todayKey = getDayKey(referenceTime);
+    return cards.filter((card) => (
+      isCardDueAt(card, referenceTime) && getCardReviewedDayKey(card) !== todayKey
+    )).length;
   }, [cards, referenceTime]);
 
   const dueTomorrowCount = useMemo(() => {
@@ -901,15 +989,6 @@ const App = () => {
       return reviewDate >= tomorrowStart && reviewDate < dayAfterTomorrowStart;
     }).length;
   }, [cards, referenceTime]);
-
-  const learningCount = useMemo(
-    () => cards.filter((card) => (
-      card.cardData?.stage === 'learning' && (card.cardData?.learningStep || 0) > 0
-    )).length,
-    [cards]
-  );
-
-  const reviewingTodayCount = learningCount;
 
   const upcomingReviewDate = useMemo(
     () => getNextUpcomingReviewDate(cards, referenceTime),
@@ -931,10 +1010,18 @@ const App = () => {
 
     const currentCardData = cards[currentCardIndex];
     const updatedSm2 = calculateSM2(currentCardData.cardData, quality);
+    const todayKey = getDayKey(new Date());
+    const nextCardData = {
+      ...updatedSm2,
+      lastReviewedDate: todayKey,
+      lastPassedDate: quality >= 4
+        ? todayKey
+        : (currentCardData.cardData?.lastPassedDate || null),
+    };
     const updatedCard = {
       ...currentCardData,
-      cardData: updatedSm2,
-      nextReview: getNextReviewDate(updatedSm2).toISOString(),
+      cardData: nextCardData,
+      nextReview: getNextReviewDate(nextCardData).toISOString(),
     };
 
     const updatedCards = cards.map((card, index) => (
@@ -945,7 +1032,21 @@ const App = () => {
     setReferenceTime(now);
     setCards(updatedCards);
     saveCardsToStorage(updatedCards);
-    setCurrentCardIndex(findNextDueCardIndex(updatedCards, now));
+    setCurrentCardIndex(findNextCardIndexByPriority(updatedCards, now));
+  };
+
+  const updateCurrentCardNote = (noteText) => {
+    if (currentCardIndex === null) {
+      return;
+    }
+
+    const sanitizedNote = noteText || '';
+    const updatedCards = cards.map((card, index) => (
+      index === currentCardIndex ? { ...card, userNote: sanitizedNote } : card
+    ));
+
+    setCards(updatedCards);
+    saveCardsToStorage(updatedCards);
   };
 
   const dismissTooltip = () => {
@@ -1102,12 +1203,12 @@ const App = () => {
         {!isLoading && !error && activeView === 'flashcards' && (
           <FlashcardView
             card={currentCard}
-            dueCount={dueCount}
+            newCount={newCount}
             dueTomorrowCount={dueTomorrowCount}
-            learningCount={learningCount}
-            reviewingTodayCount={reviewingTodayCount}
+            reviewingCount={reviewingCount}
             upcomingReviewDate={upcomingReviewDate}
             onGrade={handleCardGrade}
+            onNoteChange={updateCurrentCardNote}
           />
         )}
 

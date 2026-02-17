@@ -462,6 +462,39 @@ button {
   max-width: 70ch;
 }
 
+.notes-wrap {
+  width: 100%;
+  margin-bottom: 14px;
+  text-align: left;
+}
+
+.notes-wrap label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #2a4b40;
+}
+
+.notes-wrap textarea {
+  width: 100%;
+  min-height: 84px;
+  border-radius: 10px;
+  border: 1px solid rgba(17, 83, 65, 0.32);
+  padding: 10px;
+  font-family: inherit;
+  font-size: 0.92rem;
+  line-height: 1.4;
+  resize: vertical;
+  background: rgba(255, 255, 255, 0.8);
+  color: #1d342c;
+}
+
+.notes-wrap textarea:focus {
+  outline: 2px solid rgba(31, 124, 99, 0.34);
+  outline-offset: 1px;
+}
+
 .primary,
 .secondary {
   border: 0;
